@@ -1,0 +1,8 @@
+{
+  "name": "Remix NutriTrack AI",
+  "description": "A real-time PWA that uses Gemini AI to track nutrition and sync your meal logs across all devices.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

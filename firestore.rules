@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default-deny all unmatched paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDateStr(dateStr) {
+      return dateStr is string && dateStr.size() == 10 && dateStr.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidFoodEntry(entry) {
+      return entry is map
+        && entry.keys().hasAll(['id', 'meal', 'foodItem', 'quantity', 'measurement', 'calories', 'protein', 'carbs', 'fat', 'sugar', 'createdAt'])
+        && entry.keys().hasOnly(['id', 'meal', 'foodItem', 'quantity', 'measurement', 'calories', 'protein', 'carbs', 'fat', 'sugar', 'createdAt'])
+        && isValidId(entry.id)
+        && entry.meal in ['Breakfast', 'Lunch', 'Dinner', 'Snack']
+        && entry.foodItem is string && entry.foodItem.size() >= 1 && entry.foodItem.size() <= 160
+        && entry.quantity is number && entry.quantity > 0 && entry.quantity <= 100000
+        && entry.measurement in ['Pcs', 'g', 'Kg', 'ml', 'tbsp', 'tsp']
+        && entry.calories is number && entry.calories >= 0 && entry.calories <= 50000
+        && entry.protein is number && entry.protein >= 0 && entry.protein <= 5000
+        && entry.carbs is number && entry.carbs >= 0 && entry.carbs <= 5000
+        && entry.fat is number && entry.fat >= 0 && entry.fat <= 5000
+        && entry.sugar is number && entry.sugar >= 0 && entry.sugar <= 5000
+        && entry.createdAt is string && entry.createdAt.size() >= 1 && entry.createdAt.size() <= 64;
+    }
+
+    function isValidDailyFoodLog(data, userId, dateId) {
+      return data.keys().hasAll(['userId', 'date', 'items', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'date', 'items', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && isValidDateStr(data.date)
+        && data.date == dateId
+        && data.items is list
+        && data.items.size() <= 100
+        && (data.items.size() == 0 || isValidFoodEntry(data.items[0]))
+        && data.updatedAt == request.time;
+    }
+
+    match /users/{userId}/logs/{date} {
+      allow get: if isValidId(userId) && isValidDateStr(date) && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+
+      allow create: if isVerified()
+        && isValidId(userId)
+        && isValidDateStr(date)
+        && isOwner(userId)
+        && isValidDailyFoodLog(incoming(), userId, date);
+
+      allow update: if isVerified()
+        && isValidId(userId)
+        && isValidDateStr(date)
+        && isOwner(userId)
+        && isValidDailyFoodLog(incoming(), userId, date)
+        && incoming().userId == existing().userId
+        && incoming().date == existing().date
+        && incoming().diff(existing()).affectedKeys().hasOnly(['items', 'updatedAt']);
+
+      allow delete: if isVerified()
+        && isValidId(userId)
+        && isValidDateStr(date)
+        && isOwner(userId);
+    }
+  }
+}

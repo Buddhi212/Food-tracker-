@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "DailyFoodLog": {
+      "title": "DailyFoodLog",
+      "description": "A user's daily calorie and macronutrient food entries for a single calendar date.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "description": "Calendar date in YYYY-MM-DD format",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "items": {
+          "type": "array",
+          "description": "Bounded list (max 100) of food items logged for the day, each with id, meal, foodItem, quantity, measurement, calories, protein, carbs, fat, sugar, and createdAt."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-assigned timestamp of last modification"
+        }
+      },
+      "required": ["userId", "date", "items", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/logs/{date}": {
+      "schema": {
+        "$ref": "#/entities/DailyFoodLog"
+      },
+      "description": "Per-user daily food logs keyed by YYYY-MM-DD date string."
+    }
+  }
+}
